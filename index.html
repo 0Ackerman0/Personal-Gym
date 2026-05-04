@@ -316,6 +316,69 @@ body {
 .goal-card .goal-icon { font-size: 1.6rem; margin-bottom: 6px; }
 .goal-card .goal-lbl { font-size: 0.72rem; font-weight: 600; color: var(--t2); }
 .goal-card.active .goal-lbl { color: var(--p2); }
+.goal-card.active::after { content:'✓'; position:absolute; top:6px; right:8px; font-size:0.65rem; font-weight:800; color:var(--p2); }
+.goal-card { position:relative; }
+.goal-multi-hint { font-size:0.72rem; color:var(--t3); margin-bottom:10px; display:flex; align-items:center; gap:6px; }
+.goal-count-badge { background:rgba(129,140,248,0.2); border:1px solid rgba(129,140,248,0.4); border-radius:99px; padding:2px 10px; color:var(--p2); font-weight:700; font-size:0.7rem; }
+
+/* ── MODAL STEPPER ── */
+.modal-yt-btn {
+  display:flex; align-items:center; gap:10px;
+  width:100%; padding:13px 18px;
+  background:linear-gradient(135deg,rgba(239,68,68,0.15),rgba(239,68,68,0.08));
+  border:1px solid rgba(239,68,68,0.3);
+  border-radius:14px; color:#f87171;
+  font-size:0.85rem; font-weight:700;
+  cursor:pointer; margin-bottom:16px;
+  transition:all 0.3s; text-decoration:none;
+  font-family:inherit;
+}
+.modal-yt-btn:hover { background:rgba(239,68,68,0.2); transform:translateY(-1px); }
+.modal-yt-btn .yt-icon { font-size:1.2rem; }
+
+.modal-stepper-wrap { margin-top:4px; }
+.stepper-header {
+  display:flex; align-items:center; justify-content:space-between;
+  margin-bottom:14px;
+}
+.stepper-dots { display:flex; gap:6px; }
+.stepper-dot {
+  width:8px; height:8px; border-radius:50%;
+  background:var(--border2); transition:all 0.3s;
+}
+.stepper-dot.active { background:var(--p); width:24px; border-radius:99px; }
+.stepper-dot.done { background:var(--g); }
+.stepper-label { font-size:0.72rem; font-weight:700; color:var(--t3); letter-spacing:1px; text-transform:uppercase; }
+
+.step-card {
+  background:rgba(129,140,248,0.06);
+  border:1px solid rgba(129,140,248,0.15);
+  border-radius:16px; padding:20px;
+  min-height:100px;
+  animation:fadeUp 0.3s ease;
+  margin-bottom:14px;
+}
+.step-card-num {
+  display:inline-flex; align-items:center; justify-content:center;
+  width:32px; height:32px; border-radius:10px;
+  background:var(--p); color:#fff;
+  font-size:0.8rem; font-weight:800;
+  margin-bottom:12px;
+}
+.step-card-text { font-size:0.92rem; color:var(--t); line-height:1.7; font-weight:500; }
+
+.stepper-nav { display:flex; gap:10px; }
+.stepper-btn {
+  flex:1; padding:11px;
+  background:var(--glass); border:1px solid var(--border2);
+  border-radius:12px; color:var(--t2);
+  font-size:0.82rem; font-weight:700;
+  cursor:pointer; transition:all 0.3s; font-family:inherit;
+}
+.stepper-btn:hover { border-color:var(--p); color:var(--p2); }
+.stepper-btn.next-btn { background:rgba(129,140,248,0.15); border-color:var(--p); color:var(--p2); }
+.stepper-btn:disabled { opacity:0.35; cursor:not-allowed; }
+.stepper-btn.done-btn { background:rgba(52,211,153,0.15); border-color:var(--g); color:var(--g); }
 
 /* Days Selector */
 .days-row { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -1057,6 +1120,7 @@ body {
       <!-- Goal Selector -->
       <div class="glass-card">
         <div class="card-title">🎯 <span data-t="goal_lbl">Your Goal</span></div>
+        <div class="goal-multi-hint">✅ Pick one or more &nbsp;<span class="goal-count-badge" id="goal-count-badge">1 selected</span></div>
         <div class="goal-grid" id="goal-grid">
           <div class="goal-card active" data-goal="muscle"><div class="goal-icon">💪</div><div class="goal-lbl" data-t="g_muscle">Build Muscle</div></div>
           <div class="goal-card" data-goal="fat_loss"><div class="goal-icon">🔥</div><div class="goal-lbl" data-t="g_fat">Burn Fat</div></div>
@@ -1703,7 +1767,7 @@ const DB = {
 // ═══════════════════════════════════════════════════════
 //  STATE
 // ═══════════════════════════════════════════════════════
-let profile = {}, plan = [], selectedGoal='muscle', selectedDays=4, libFilter='All';
+let profile = {}, plan = [], selectedGoals=['muscle'], selectedDays=4, libFilter='All';
 
 // ═══════════════════════════════════════════════════════
 //  NAVIGATION
@@ -1729,10 +1793,38 @@ function switchTab(name) {
 // ═══════════════════════════════════════════════════════
 //  SETUP
 // ═══════════════════════════════════════════════════════
+function updateGoalBadge(){
+  const badge=document.getElementById('goal-count-badge');
+  if(badge) badge.textContent=selectedGoals.length+' selected';
+}
+
 function initSetup() {
-  document.querySelectorAll('#goal-grid .goal-card').forEach(c=>{
-    c.onclick=()=>{ document.querySelectorAll('#goal-grid .goal-card').forEach(x=>x.classList.remove('active')); c.classList.add('active'); selectedGoal=c.dataset.goal; };
+  // Render goal cards dynamically to support multi-select
+  const grid=document.getElementById('goal-grid');
+  const goals=[
+    {k:'muscle',icon:'💪',enLbl:'Build Muscle',arLbl:'بناء العضلات'},
+    {k:'fat_loss',icon:'🔥',enLbl:'Burn Fat',arLbl:'حرق الدهون'},
+    {k:'strength',icon:'⚡',enLbl:'Strength',arLbl:'بناء القوة'},
+    {k:'endurance',icon:'🏃',enLbl:'Endurance',arLbl:'التحمل'},
+    {k:'tone',icon:'✨',enLbl:'Tone Up',arLbl:'نحت الجسم'},
+    {k:'general',icon:'🌟',enLbl:'General Fit',arLbl:'لياقة عامة'},
+  ];
+  grid.innerHTML='';
+  goals.forEach(g=>{
+    const c=document.createElement('div');
+    c.className='goal-card'+(selectedGoals.includes(g.k)?' active':'');
+    c.dataset.goal=g.k;
+    c.innerHTML=`<div class="goal-icon">${g.icon}</div><div class="goal-lbl">${LANG==='ar'?g.arLbl:g.enLbl}</div>`;
+    c.onclick=()=>{
+      if(selectedGoals.includes(g.k)){
+        if(selectedGoals.length>1) selectedGoals=selectedGoals.filter(x=>x!==g.k);
+      } else { selectedGoals.push(g.k); }
+      c.classList.toggle('active',selectedGoals.includes(g.k));
+      updateGoalBadge();
+    };
+    grid.appendChild(c);
   });
+  updateGoalBadge();
   document.querySelectorAll('#days-row .day-chip').forEach(c=>{
     c.onclick=()=>{ document.querySelectorAll('#days-row .day-chip').forEach(x=>x.classList.remove('active')); c.classList.add('active'); selectedDays=parseInt(c.dataset.n); };
   });
@@ -1750,19 +1842,20 @@ function generatePlan() {
 
   if(!weight||!height){ showToast(LANG==='ar'?'يرجى إدخال الوزن والطول':'Enter weight & height!','warn'); return; }
 
+  const primaryGoal = selectedGoals[0]||'muscle';
   const bmi = weight/((height/100)**2);
   const bmr = gender==='male'
     ? 88.362+(13.397*weight)+(4.799*height)-(5.677*age)
     : 447.593+(9.247*weight)+(3.098*height)-(4.330*age);
   const tdee = Math.round(bmr*activity);
   const calMap={muscle:tdee+300,fat_loss:tdee-400,strength:tdee+100,tone:tdee-150,endurance:tdee,general:tdee};
-  const calories = calMap[selectedGoal]||tdee;
+  const calories = calMap[primaryGoal]||tdee;
   const proteinFactor = {muscle:2.4,fat_loss:2.2,strength:2.2,tone:2.0,endurance:1.8,general:2.0};
-  const protein = Math.round(weight*(proteinFactor[selectedGoal]||2));
+  const protein = Math.round(weight*(proteinFactor[primaryGoal]||2));
   const fats = Math.round(weight*1.0);
   const carbs = Math.max(Math.round((calories-(protein*4)-(fats*9))/4),50);
 
-  profile = {name,age,gender,weight,height,bodyfat,activity,level,goal:selectedGoal,days:selectedDays,
+  profile = {name,age,gender,weight,height,bodyfat,activity,level,goal:primaryGoal,goals:selectedGoals,days:selectedDays,
     bmi:bmi.toFixed(1),bmr:Math.round(bmr),tdee,calories,protein,carbs,fats,createdAt:new Date().toISOString()};
   DB.s('profile',profile);
 
@@ -2024,20 +2117,69 @@ function openModal(id){
   const data=LANG==='ar'?ex.ar:ex.en;
   document.getElementById('modal-name').textContent=`${ex.icon} ${data.name}`;
   document.getElementById('modal-muscle').textContent=LANG==='ar'?muscleAR(ex.muscle):ex.muscle;
-  document.getElementById('modal-content').innerHTML=`
-    <div class="stat-row">
-      <div class="stat-mini"><div class="stat-mini-val">${ex.sets}</div><div class="stat-mini-lbl">${t('sets_label')}</div></div>
-      <div class="stat-mini"><div class="stat-mini-val">${ex.reps}</div><div class="stat-mini-lbl">${t('reps_label')}</div></div>
-      <div class="stat-mini"><div class="stat-mini-val">${ex.rest}</div><div class="stat-mini-lbl">${t('rest_label')}</div></div>
-    </div>
-    <p style="font-size:0.88rem;color:var(--t2);line-height:1.7;margin-bottom:16px">${data.desc}</p>
-    <div class="section-header">${t('muscles_title')}</div>
-    <div class="muscle-tags">${data.muscles.map(m=>`<span class="muscle-tag">${m}</span>`).join('')}</div>
-    <div class="divider"></div>
-    <div class="section-header">${t('steps_title')}</div>
-    <div class="steps-list">${data.steps.map((s,i)=>`<div class="step-item"><div class="step-num">${i+1}</div><div>${s}</div></div>`).join('')}</div>
-    <div class="tip-box">💡 <strong>${t('pro_tip')}:</strong> ${data.tip}</div>
-  `;
+
+  const ytQuery=encodeURIComponent(data.name+' exercise tutorial form');
+  const ytUrl=`https://www.youtube.com/results?search_query=${ytQuery}`;
+
+  const steps=data.steps;
+  let currentStep=0;
+
+  function renderStepper(){
+    const dots=steps.map((_,i)=>`<div class="stepper-dot ${i<currentStep?'done':i===currentStep?'active':''}"></div>`).join('');
+    const isLast=currentStep===steps.length-1;
+    return `
+      <div class="stat-row">
+        <div class="stat-mini"><div class="stat-mini-val">${ex.sets}</div><div class="stat-mini-lbl">${t('sets_label')}</div></div>
+        <div class="stat-mini"><div class="stat-mini-val">${ex.reps}</div><div class="stat-mini-lbl">${t('reps_label')}</div></div>
+        <div class="stat-mini"><div class="stat-mini-val">${ex.rest}</div><div class="stat-mini-lbl">${t('rest_label')}</div></div>
+      </div>
+      <p style="font-size:0.88rem;color:var(--t2);line-height:1.7;margin-bottom:16px">${data.desc}</p>
+      <div class="section-header">${t('muscles_title')}</div>
+      <div class="muscle-tags">${data.muscles.map(m=>`<span class="muscle-tag">${m}</span>`).join('')}</div>
+      <div class="divider"></div>
+
+      <a class="modal-yt-btn" href="${ytUrl}" target="_blank" rel="noopener">
+        <span class="yt-icon">▶️</span>
+        ${LANG==='ar'?'شاهد الفيديو التعليمي على يوتيوب':'Watch Tutorial on YouTube'}
+        <span style="margin-left:auto;font-size:0.7rem;opacity:0.7">→</span>
+      </a>
+
+      <div class="section-header">${t('steps_title')} <span style="color:var(--t3);font-weight:400;font-size:0.75rem;margin-left:8px">${currentStep+1} / ${steps.length}</span></div>
+      <div class="modal-stepper-wrap">
+        <div class="stepper-header">
+          <div class="stepper-dots" id="stepper-dots">${dots}</div>
+          <div class="stepper-label">${LANG==='ar'?'اضغط للتالي':'Tap to continue'}</div>
+        </div>
+        <div class="step-card" id="step-card-display">
+          <div class="step-card-num">${currentStep+1}</div>
+          <div class="step-card-text">${steps[currentStep]}</div>
+        </div>
+        <div class="stepper-nav">
+          <button class="stepper-btn" id="prev-step-btn" onclick="stepperNav(-1)" ${currentStep===0?'disabled':''}>← ${LANG==='ar'?'السابق':'Prev'}</button>
+          <button class="stepper-btn ${isLast?'done-btn':'next-btn'}" id="next-step-btn" onclick="stepperNav(1)">
+            ${isLast?(LANG==='ar'?'✅ تم!':'✅ Done!'):(LANG==='ar'?'التالي →':'Next →')}
+          </button>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="tip-box">💡 <strong>${t('pro_tip')}:</strong> ${data.tip}</div>
+    `;
+  }
+
+  window._modalStepCurrent=0;
+  window._modalStepTotal=steps.length;
+  window._modalSteps=steps;
+  window._modalCurrentStep=currentStep;
+
+  window.stepperNav=function(dir){
+    window._modalCurrentStep=Math.max(0,Math.min(steps.length-1,window._modalCurrentStep+dir));
+    currentStep=window._modalCurrentStep;
+    document.getElementById('modal-content').innerHTML=renderStepper();
+  };
+
+  currentStep=0;
+  window._modalCurrentStep=0;
+  document.getElementById('modal-content').innerHTML=renderStepper();
   document.getElementById('modal-backdrop').style.display='flex';
 }
 
@@ -2116,6 +2258,8 @@ function renderProfile(){
   const goalEN={muscle:'Build Muscle 💪',fat_loss:'Burn Fat 🔥',strength:'Build Strength ⚡',endurance:'Endurance 🏃',tone:'Tone Up ✨',general:'General Fitness 🌟'};
   const goalAR={muscle:'بناء العضلات 💪',fat_loss:'حرق الدهون 🔥',strength:'بناء القوة ⚡',endurance:'التحمل 🏃',tone:'نحت الجسم ✨',general:'لياقة عامة 🌟'};
   const glab=LANG==='ar'?goalAR:goalEN;
+  const allGoals=(profile.goals||[profile.goal||'muscle']);
+  const goalBadges=allGoals.map(g=>`<span class="badge">${glab[g]||g}</span>`).join('');
   const levelAR={beginner:'مبتدئ',intermediate:'متوسط',advanced:'متقدم'};
   const levelShow=LANG==='ar'?(levelAR[profile.level]||profile.level):profile.level.charAt(0).toUpperCase()+profile.level.slice(1);
   const planName=(PLANS[profile.days]||PLANS[4]).name;
@@ -2127,7 +2271,7 @@ function renderProfile(){
         <div class="profile-name">${profile.name}</div>
         <div class="profile-handle">${profile.age}${LANG==='ar'?' سنة':' years'} · ${levelShow}</div>
         <div class="profile-badges">
-          <span class="badge">${glab[profile.goal]}</span>
+          ${goalBadges}
           <span class="badge">${profile.days}${LANG==='ar'?' أيام/أسبوع':' days/wk'}</span>
           <span class="badge">${planName}</span>
         </div>
@@ -2169,11 +2313,11 @@ function editProfile(){
   if(profile.bodyfat) document.getElementById('in-bodyfat').value=profile.bodyfat;
   if(profile.level) document.getElementById('in-level').value=profile.level;
   if(profile.activity) document.getElementById('in-activity').value=profile.activity;
-  document.querySelectorAll('#goal-grid .goal-card').forEach(c=>c.classList.toggle('active',c.dataset.goal===profile.goal));
-  selectedGoal=profile.goal||'muscle';
   document.querySelectorAll('#days-row .day-chip').forEach(c=>c.classList.toggle('active',parseInt(c.dataset.n)===profile.days));
   selectedDays=profile.days||4;
+  selectedGoals=profile.goals||[profile.goal||'muscle'];
   show('screen-setup');
+  initSetup();
 }
 
 function resetAll(){ if(confirm(LANG==='ar'?'مسح كل البيانات؟ لا يمكن التراجع!':'Delete all data? This cannot be undone.')){ localStorage.clear(); location.reload(); } }
