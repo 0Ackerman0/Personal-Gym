@@ -249,7 +249,8 @@ body {
 .setup-title .grad-text { background: var(--grad); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
 .setup-sub { color: var(--t3); margin-top: 6px; font-size: 0.9rem; }
 
-.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; margin-bottom: 24px; }
+.form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 24px; }
+@media (max-width: 640px) { .form-grid { grid-template-columns: 1fr; } }
 
 .glass-card {
   background: var(--glass);
@@ -1000,6 +1001,73 @@ body {
 .divider { height: 1px; background: var(--border); margin: 16px 0; }
 .section-header { font-size: 0.8rem; font-weight: 700; color: var(--t3); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 12px; }
 
+/* ── SKIP TODAY FEATURE ── */
+.skip-btn-wrap { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
+.skip-trigger-btn {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; padding: 10px 14px;
+  background: rgba(251,146,60,0.07);
+  border: 1px dashed rgba(251,146,60,0.3);
+  border-radius: 12px; color: var(--o);
+  font-size: 0.82rem; font-weight: 600;
+  cursor: pointer; transition: all 0.3s; font-family: inherit;
+  justify-content: center;
+}
+.skip-trigger-btn:hover { background: rgba(251,146,60,0.14); border-color: rgba(251,146,60,0.5); }
+.skip-trigger-btn.skipped-state { background: rgba(248,113,113,0.1); border-color: rgba(248,113,113,0.3); color: var(--r); }
+
+.skip-options-panel {
+  margin-top: 10px;
+  background: rgba(251,146,60,0.06);
+  border: 1px solid rgba(251,146,60,0.2);
+  border-radius: 14px; padding: 16px;
+  animation: fadeUp 0.3s ease;
+}
+.skip-panel-title { font-size: 0.8rem; font-weight: 700; color: var(--t2); margin-bottom: 12px; text-align: center; }
+.skip-options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.skip-option-btn {
+  padding: 10px 8px; border-radius: 10px;
+  font-size: 0.78rem; font-weight: 700;
+  cursor: pointer; transition: all 0.25s; font-family: inherit;
+  border: 1px solid var(--border2);
+  background: var(--glass); color: var(--t2);
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+.skip-option-btn:hover { border-color: var(--p); color: var(--p2); background: rgba(129,140,248,0.1); }
+.skip-option-btn.rest-opt { border-color: rgba(52,211,153,0.3); color: var(--g); background: rgba(52,211,153,0.07); }
+.skip-option-btn.rest-opt:hover { background: rgba(52,211,153,0.15); }
+.skip-option-btn span.opt-day { font-size: 1rem; }
+.skip-option-btn span.opt-lbl { font-size: 0.68rem; opacity: 0.8; }
+
+/* Skipped / rescheduled state in dashboard */
+.skipped-today-box {
+  background: rgba(248,113,113,0.08);
+  border: 1px solid rgba(248,113,113,0.2);
+  border-radius: 16px; padding: 20px;
+  text-align: center; animation: fadeUp 0.3s ease;
+}
+.skipped-today-box .skip-icon { font-size: 2.5rem; margin-bottom: 8px; }
+.skipped-today-box .skip-title { font-size: 1rem; font-weight: 700; color: var(--r); margin-bottom: 4px; }
+.skipped-today-box .skip-sub { font-size: 0.8rem; color: var(--t3); margin-bottom: 14px; line-height: 1.6; }
+.skip-undo-btn {
+  padding: 8px 20px; border-radius: 10px;
+  background: var(--glass); border: 1px solid var(--border2);
+  color: var(--t2); font-size: 0.78rem; font-weight: 600;
+  cursor: pointer; font-family: inherit; transition: all 0.25s;
+}
+.skip-undo-btn:hover { border-color: var(--p); color: var(--p2); }
+
+/* Week card badges */
+.wday-badge {
+  font-size: 0.5rem; font-weight: 800;
+  padding: 2px 6px; border-radius: 99px;
+  margin-top: 3px; text-transform: uppercase; letter-spacing: 0.5px;
+}
+.wday-badge.skipped { background: rgba(248,113,113,0.2); color: var(--r); }
+.wday-badge.rescheduled { background: rgba(251,146,60,0.2); color: var(--o); }
+.wday-card.skipped-day { border-color: rgba(248,113,113,0.25) !important; opacity: 0.7; }
+.wday-card.rescheduled-day { border-color: rgba(251,146,60,0.4) !important; background: rgba(251,146,60,0.07) !important; }
+
 /* EMPTY STATE */
 .empty-state { text-align: center; padding: 48px 20px; }
 .empty-state-icon { font-size: 3rem; opacity: 0.3; margin-bottom: 12px; }
@@ -1404,7 +1472,9 @@ function setLang(lang) {
   const lwar = document.getElementById('lw-ar');
   if(lwen) { lwen.classList.toggle('active', lang==='en'); lwar.classList.toggle('active', lang==='ar'); }
   applyTranslations();
-  DB.save('lang', lang);
+  DB.s('lang', lang);
+  // Re-render goal cards with correct language if on setup screen
+  if(document.getElementById('screen-setup').classList.contains('active')) initSetup();
 }
 
 function toggleLang() { setLang(LANG === 'en' ? 'ar' : 'en'); }
@@ -1918,19 +1988,41 @@ function renderDashboard(){
     exCont.innerHTML=`<div class="tip-box">😴 <strong>${LANG==='ar'?'يوم راحة!':'Rest Day!'}</strong> ${LANG==='ar'?'الراحة هي وقت نمو عضلاتك. احرص على النوم والتغذية والترطيب الجيد.':'Rest is when your muscles actually grow. Focus on sleep, nutrition & hydration.'}</div>`;
     document.getElementById('today-prog-txt').textContent='0/0';
   } else {
-    let doneCount=0;
-    todayPlan.exercises.forEach((ex,i)=>{
-      const isDone=done[ex.id];
-      if(isDone) doneCount++;
-      const en=ex.en, ar=ex.ar;
-      const nm=LANG==='ar'?ar.name:en.name;
-      const div=document.createElement('div');
-      div.className='workout-item'+(isDone?' done':'');
-      div.innerHTML=`<div class="wi-num">${isDone?'✓':i+1}</div><div class="wi-info"><div class="wi-name">${nm}</div><div class="wi-detail">${ex.sets} sets × ${ex.reps} · ${ex.rest}</div></div><div class="wi-check">${isDone?'✓':''}</div>`;
-      div.onclick=()=>toggleDone(ex.id,todayPlan,div,i+1);
-      exCont.appendChild(div);
-    });
-    updateProgress(doneCount,todayPlan.exercises.length);
+    const skipData = getSkipData();
+    if(skipData && skipData.dayIdx === dayIdx){
+      // Today was skipped
+      const reschedMsg = skipData.rescheduledTo !== null
+        ? (LANG==='ar'
+            ? `📅 تمرينك اتنقل إلى <strong>${plan[skipData.rescheduledTo].fullDayAr}</strong>`
+            : `📅 Workout moved to <strong>${plan[skipData.rescheduledTo].fullDayEn}</strong>`)
+        : (LANG==='ar' ? '😴 تم تحويل اليوم إلى يوم راحة' : '😴 Day converted to rest');
+      exCont.innerHTML=`
+        <div class="skipped-today-box">
+          <div class="skip-icon">🏖️</div>
+          <div class="skip-title">${LANG==='ar'?'قررت تاخد إجازة النهارده!':'Taking a break today!'}</div>
+          <div class="skip-sub">${reschedMsg}</div>
+          <button class="skip-undo-btn" onclick="undoSkip()">↩️ ${LANG==='ar'?'تراجع':'Undo'}</button>
+        </div>`;
+      document.getElementById('today-prog-txt').textContent='–';
+    } else {
+      let doneCount=0;
+      todayPlan.exercises.forEach((ex,i)=>{
+        const isDone=done[ex.id];
+        if(isDone) doneCount++;
+        const en=ex.en, ar=ex.ar;
+        const nm=LANG==='ar'?ar.name:en.name;
+        const div=document.createElement('div');
+        div.className='workout-item'+(isDone?' done':'');
+        div.innerHTML=`<div class="wi-num">${isDone?'✓':i+1}</div><div class="wi-info"><div class="wi-name">${nm}</div><div class="wi-detail">${ex.sets} sets × ${ex.reps} · ${ex.rest}</div></div><div class="wi-check">${isDone?'✓':''}</div>`;
+        div.onclick=()=>toggleDone(ex.id,todayPlan,div,i+1);
+        exCont.appendChild(div);
+      });
+      updateProgress(doneCount,todayPlan.exercises.length);
+      // Add skip button at the bottom
+      const skipWrap=document.createElement('div');
+      skipWrap.innerHTML=renderSkipButton(dayIdx, todayPlan);
+      exCont.appendChild(skipWrap.firstElementChild);
+    }
   }
 
   // BMI
@@ -2028,6 +2120,79 @@ function renderWeekSummary(){
 }
 
 // ═══════════════════════════════════════════════════════
+//  SKIP TODAY FEATURE
+// ═══════════════════════════════════════════════════════
+function getTodayKey(){ const d=new Date(); return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`; }
+
+function getSkipData(){ return DB.l('skip_'+getTodayKey(), null); }
+
+function toggleSkipPanel(){
+  const panel=document.getElementById('skip-options-panel');
+  if(!panel) return;
+  panel.style.display=panel.style.display==='none'?'block':'none';
+}
+
+function skipToday(rescheduleTo){
+  const now=new Date();
+  const dayIdx=now.getDay()===0?6:now.getDay()-1;
+  const skipData={ dayIdx, rescheduledTo: rescheduleTo, date: getTodayKey() };
+  DB.s('skip_'+getTodayKey(), skipData);
+  renderDashboard();
+  renderPlanTab();
+  const msg = rescheduleTo !== null
+    ? (LANG==='ar'
+        ? `✅ تم نقل التمرين إلى ${LANG==='ar'?plan[rescheduleTo].fullDayAr:plan[rescheduleTo].fullDayEn}`
+        : `✅ Workout moved to ${plan[rescheduleTo].fullDayEn}`)
+    : (LANG==='ar' ? '😴 تم تحويل اليوم لراحة' : '😴 Marked as rest day');
+  showToast(msg);
+}
+
+function undoSkip(){
+  DB.d('skip_'+getTodayKey());
+  renderDashboard();
+  renderPlanTab();
+  showToast(LANG==='ar'?'↩️ تم الإلغاء':'↩️ Skip cancelled');
+}
+
+function renderSkipButton(todayIdx, todayPlan){
+  // Find future rest days this week that could absorb the workout
+  const restDays = [];
+  plan.forEach((d,i)=>{
+    if(i > todayIdx && d.type === 'rest'){
+      restDays.push(i);
+    }
+  });
+  const sdays = LANG==='ar' ? SHORT_DAY_AR : SHORT_DAY_EN;
+  const fdays = LANG==='ar' ? FULL_DAY_AR : FULL_DAY_EN;
+
+  const optionsHTML = restDays.length > 0
+    ? restDays.map(i=>`
+        <button class="skip-option-btn" onclick="skipToday(${i})">
+          <span class="opt-day">${sdays[i]}</span>
+          <span class="opt-lbl">${LANG==='ar'?'نقل هنا':'Move here'}</span>
+        </button>`).join('')
+    : ''  ;
+
+  return `
+    <div class="skip-btn-wrap">
+      <button class="skip-trigger-btn" onclick="toggleSkipPanel()">
+        😮 ${LANG==='ar'?'مش قادر تجي النهارده؟':'Can\'t make it today?'}
+      </button>
+      <div id="skip-options-panel" class="skip-options-panel" style="display:none">
+        <div class="skip-panel-title">${LANG==='ar'?'🤔 ايه اللي تعمله؟':'🤔 What do you want to do?'}</div>
+        <div class="skip-options-grid">
+          <button class="skip-option-btn rest-opt" onclick="skipToday(null)" style="grid-column:${restDays.length?'1':'1 / -1'}">
+            <span class="opt-day">😴</span>
+            <span class="opt-lbl">${LANG==='ar'?'يوم راحة':'Mark as rest'}</span>
+          </button>
+          ${optionsHTML}
+        </div>
+        ${restDays.length===0?`<div style="font-size:0.73rem;color:var(--t3);text-align:center;margin-top:8px">${LANG==='ar'?'مفيش أيام راحة متبقية هذا الأسبوع للتحويل':'No rest days left this week to reschedule to'}</div>`:''}
+      </div>
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════════════
 //  PLAN TAB
 // ═══════════════════════════════════════════════════════
 function renderPlanTab(){
@@ -2036,11 +2201,31 @@ function renderPlanTab(){
   const now=new Date();
   const todayIdx=now.getDay()===0?6:now.getDay()-1;
   const sdays=LANG==='ar'?SHORT_DAY_AR:SHORT_DAY_EN;
+  const skipData=getSkipData();
+
   plan.forEach((day,i)=>{
+    const isSkipped = skipData && skipData.dayIdx===i;
+    const isRescheduled = skipData && skipData.rescheduledTo===i;
+    let extraClass='';
+    if(isSkipped) extraClass=' skipped-day';
+    if(isRescheduled) extraClass=' rescheduled-day';
+
+    let emoji = day.type==='rest'?'😴':'🔥';
+    if(isSkipped) emoji='⏭️';
+    if(isRescheduled) emoji='🔄';
+
+    let typeLabel = day.type==='rest'?t('rest_day'):t('workout_day');
+    if(isSkipped) typeLabel=LANG==='ar'?'متخطي':'Skipped';
+    if(isRescheduled) typeLabel=LANG==='ar'?'منقول هنا':'Moved here';
+
+    let badge='';
+    if(isSkipped) badge=`<div class="wday-badge skipped">${LANG==='ar'?'تخطي':'skip'}</div>`;
+    if(isRescheduled) badge=`<div class="wday-badge rescheduled">${LANG==='ar'?'نقل':'moved'}</div>`;
+
     const div=document.createElement('div');
-    div.className='wday-card'+(day.type==='rest'?' rest-day':'')+(i===todayIdx?' today':'');
-    div.innerHTML=`<div class="wday-name">${sdays[i]}</div><div class="wday-emoji">${day.type==='rest'?'😴':'🔥'}</div><div class="wday-type">${day.type==='rest'?t('rest_day'):t('workout_day')}</div>`;
-    div.onclick=()=>showDayDetail(i,div);
+    div.className='wday-card'+(day.type==='rest'?' rest-day':'')+(i===todayIdx?' today':'')+extraClass;
+    div.innerHTML=`<div class="wday-name">${sdays[i]}</div><div class="wday-emoji">${emoji}</div><div class="wday-type">${typeLabel}</div>${badge}`;
+    div.onclick=()=>showDayDetail(i,div,isSkipped,isRescheduled,skipData);
     strip.appendChild(div);
   });
   document.getElementById('day-detail-box').style.display='none';
